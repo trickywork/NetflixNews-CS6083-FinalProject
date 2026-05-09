@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback - Netflix News System</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/echarts.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/index.html" class="logo">NETFLIX NEWS</a>
+        <ul class="nav-links" id="nav-links">
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/web-series.html">Web Series</a></li>
+            <li><a href="/schedules.html">Schedules</a></li>
+            <li><a href="/feedback.html" class="active">Feedback</a></li>
+        </ul>
+        <div class="nav-user" id="nav-user"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">User Feedback</h1>
+            </div>
+
+            <!-- Rating Distribution Chart -->
+            <div class="chart-container">
+                <div class="chart-title">Rating Distribution</div>
+                <div id="ratingChart" style="height: 250px;"></div>
+            </div>
+
+            <!-- My Feedback Section (for customers) -->
+            <div id="my-feedback-section" style="display: none;">
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3 class="card-title">My Reviews</h3>
+                    </div>
+                    <div id="my-feedback-list"></div>
+                </div>
+            </div>
+
+            <!-- All Feedback Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Web Series</th>
+                            <th>Rating</th>
+                            <th>Comment</th>
+                            <th>Date</th>
+                            <th id="actions-header" style="display: none;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedback-table"></tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </main>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let currentPage = 1;
+        const pageSize = 10;
+        let user = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            user = Auth.getUser();
+            setupUI();
+            loadRatingChart();
+            loadFeedback();
+            if (user && user.role === 'customer') {
+                loadMyFeedback();
+            }
+        });
+
+        // Setup UI based on role
+        function setupUI() {
+            if (user) {
+                document.getElementById('actions-header').style.display = '';
+                if (user.role === 'customer') {
+                    document.getElementById('my-feedback-section').style.display = 'block';
+                }
+            }
+        }
+
+        // Load rating distribution chart
+        async function loadRatingChart() {
+            const result = await FeedbackAPI.getRatingDistribution();
+            if (result.code === 200 && result.data) {
+                const chartDom = document.getElementById('ratingChart');
+                const myChart = echarts.init(chartDom);
+                
+                const xData = ['1 Star', '2 Stars', '3 Stars', '4 Stars', '5 Stars'];
+                const yData = [0, 0, 0, 0, 0];
+                result.data.forEach(item => {
+                    yData[item.rating - 1] = item.count;
+                });
+
+                const option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: { type: 'shadow' }
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: xData,
+                        axisLabel: { color: '#e5e5e5' },
+                        axisLine: { lineStyle: { color: '#404040' } }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        axisLabel: { color: '#e5e5e5' },
+                        axisLine: { lineStyle: { color: '#404040' } },
+                        splitLine: { lineStyle: { color: '#333' } }
+                    },
+                    series: [{
+                        data: yData,
+                        type: 'bar',
+                        itemStyle: {
+                            color: function(params) {
+                                const colors = ['#E50914', '#fd7e14', '#f5c518', '#20c997', '#46d369'];
+                                return colors[params.dataIndex];
+                            },
+                            borderRadius: [4, 4, 0, 0]
+                        }
+                    }]
+                };
+
+                myChart.setOption(option);
+                window.addEventListener('resize', () => myChart.resize());
+            }
+        }
+
+        // Load my feedback (for customers)
+        async function loadMyFeedback() {
+            const result = await FeedbackAPI.getMyFeedback();
+            if (result.code === 200) {
+                const container = document.getElementById('my-feedback-list');
+                if (result.data.length === 0) {
+                    container.innerHTML = '<p style="padding: 20px; color: #757575;">You haven\'t submitted any reviews yet. <a href="/web-series.html">Browse web series</a> to leave a review.</p>';
+                    return;
+                }
+                
+                container.innerHTML = result.data.map(fb => `
+                    <div style="padding: 20px; border-bottom: 1px solid #404040; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <a href="/web-series-detail.html?id=${fb.webSeriesId}" style="font-weight: 600;">${fb.webSeriesName}</a>
+                            <span style="color: #f5c518; margin-left: 10px;">${'★'.repeat(fb.rating)}${'☆'.repeat(5-fb.rating)}</span>
+                            <p style="color: #757575; margin-top: 5px; font-size: 14px;">${fb.feedbackText || '<i>No comment</i>'}</p>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="deleteFeedback(${fb.feedbackId})">Delete</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Load all feedback with pagination
+        async function loadFeedback(page = 1) {
+            currentPage = page;
+            Loading.show();
+            
+            try {
+                const result = await FeedbackAPI.getPage(page, pageSize);
+                if (result.code === 200) {
+                    renderTable(result.data.content);
+                    Pagination.render('pagination', result.data.page, result.data.totalPages, 'loadFeedback');
+                }
+            } catch (error) {
+                Toast.error('Failed to load feedback');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Render table
+        function renderTable(feedbackList) {
+            const tbody = document.getElementById('feedback-table');
+            if (feedbackList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #757575;">No feedback found.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = feedbackList.map(fb => {
+                const canDelete = user && (user.role === 'employee' || (user.accountId && user.accountId === fb.accountId));
+                
+                return `
+                    <tr>
+                        <td>${fb.feedbackId}</td>
+                        <td>${fb.accountName || 'Anonymous'}</td>
+                        <td><a href="/web-series-detail.html?id=${fb.webSeriesId}">${fb.webSeriesName}</a></td>
+                        <td style="color: #f5c518;">${'★'.repeat(fb.rating)}${'☆'.repeat(5-fb.rating)}</td>
+                        <td>${Format.truncate(fb.feedbackText || '-', 50)}</td>
+                        <td>${Format.date(fb.feedbackDate)}</td>
+                        ${user ? `
+                            <td class="actions">
+                                ${canDelete ? `<button class="btn btn-danger btn-sm" onclick="deleteFeedback(${fb.feedbackId})">Delete</button>` : ''}
+                            </td>
+                        ` : ''}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Delete feedback
+        async function deleteFeedback(id) {
+            if (!confirm('Are you sure you want to delete this feedback?')) return;
+            
+            Loading.show();
+            
+            try {
+                const result = await FeedbackAPI.delete(id);
+                if (result.code === 200) {
+                    Toast.success('Feedback deleted!');
+                    loadFeedback(currentPage);
+                    loadRatingChart();
+                    if (user && user.role === 'customer') {
+                        loadMyFeedback();
+                    }
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to delete feedback');
+            } finally {
+                Loading.hide();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Series Detail - Netflix News System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/index.html" class="logo">NETFLIX NEWS</a>
+        <ul class="nav-links" id="nav-links">
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/web-series.html" class="active">Web Series</a></li>
+            <li><a href="/schedules.html">Schedules</a></li>
+            <li><a href="/feedback.html">Feedback</a></li>
+        </ul>
+        <div class="nav-user" id="nav-user"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <a href="/web-series.html" class="btn btn-outline">← Back to List</a>
+            </div>
+
+            <!-- Series Detail -->
+            <div class="grid-2" style="gap: 30px;">
+                <div>
+                    <div class="series-poster" style="height: 300px; border-radius: 8px; font-size: 100px;">🎬</div>
+                </div>
+                <div>
+                    <h1 id="series-name" style="font-size: 36px; margin-bottom: 10px;">-</h1>
+                    <span class="series-type" id="series-type" style="font-size: 14px;">-</span>
+                    <div class="series-rating" id="series-rating" style="font-size: 24px; margin: 15px 0;"></div>
+                    
+                    <div class="grid-2" style="margin-top: 20px;">
+                        <div>
+                            <p style="color: #757575;">Episodes</p>
+                            <p id="series-episodes" style="font-size: 20px; font-weight: 600;">-</p>
+                        </div>
+                        <div>
+                            <p style="color: #757575;">Language</p>
+                            <p id="series-language" style="font-size: 20px; font-weight: 600;">-</p>
+                        </div>
+                        <div>
+                            <p style="color: #757575;">Release Date</p>
+                            <p id="series-release" style="font-size: 20px; font-weight: 600;">-</p>
+                        </div>
+                        <div>
+                            <p style="color: #757575;">Total Viewers</p>
+                            <p id="series-viewers" style="font-size: 20px; font-weight: 600;">-</p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <p style="color: #757575;">Countries</p>
+                        <p id="series-countries" style="font-size: 16px;">-</p>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <p style="color: #757575;">Dubbing</p>
+                        <p id="series-dubbing" style="font-size: 16px;">-</p>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <p style="color: #757575;">Subtitles</p>
+                        <p id="series-subtitles" style="font-size: 16px;">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback Section -->
+            <div class="card" style="margin-top: 40px;">
+                <div class="card-header">
+                    <h3 class="card-title">Reviews</h3>
+                    <button class="btn btn-primary btn-sm" id="add-feedback-btn" style="display: none;" onclick="openFeedbackModal()">+ Add Review</button>
+                </div>
+                <div id="feedback-list"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Feedback Modal -->
+    <div class="modal-overlay" id="feedbackModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Write a Review</h3>
+                <button class="modal-close" onclick="Modal.hide('feedbackModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="feedbackForm">
+                    <div class="form-group">
+                        <label class="form-label">Rating *</label>
+                        <div class="rating" id="rating-stars">
+                            <span class="star" data-rating="1">★</span>
+                            <span class="star" data-rating="2">★</span>
+                            <span class="star" data-rating="3">★</span>
+                            <span class="star" data-rating="4">★</span>
+                            <span class="star" data-rating="5">★</span>
+                        </div>
+                        <input type="hidden" id="rating" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Your Review</label>
+                        <textarea id="feedbackText" class="form-control" rows="4" placeholder="Share your thoughts about this series..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="Modal.hide('feedbackModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitFeedback()">Submit Review</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let seriesId = null;
+        let currentRating = 5;
+
+        // Get series ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        seriesId = urlParams.get('id');
+
+        if (!seriesId) {
+            window.location.href = '/web-series.html';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSeriesDetail();
+            loadFeedback();
+            setupRatingStars();
+            checkUserCanReview();
+        });
+
+        // Load series detail
+        async function loadSeriesDetail() {
+            const result = await WebSeriesAPI.getById(seriesId);
+            if (result.code === 200) {
+                const s = result.data;
+                document.getElementById('series-name').textContent = s.name;
+                document.getElementById('series-type').textContent = s.type;
+                document.getElementById('series-episodes').textContent = s.numberOfEpisodes;
+                document.getElementById('series-language').textContent = s.originalLanguage;
+                document.getElementById('series-release').textContent = Format.date(s.releaseDate);
+                document.getElementById('series-viewers').textContent = Format.number(s.totalViewers);
+                
+                if (s.averageRating) {
+                    document.getElementById('series-rating').innerHTML = 
+                        `<span>★</span><span>${s.averageRating.toFixed(1)} / 5</span>`;
+                } else {
+                    document.getElementById('series-rating').innerHTML = '<span style="color: #757575;">No ratings yet</span>';
+                }
+                
+                document.getElementById('series-countries').textContent = 
+                    s.countries && s.countries.length ? s.countries.map(c => c.countryName).join(', ') : 'N/A';
+                document.getElementById('series-dubbing').textContent = 
+                    s.dubbingLanguages && s.dubbingLanguages.length ? s.dubbingLanguages.join(', ') : 'N/A';
+                document.getElementById('series-subtitles').textContent = 
+                    s.subtitleLanguages && s.subtitleLanguages.length ? s.subtitleLanguages.join(', ') : 'N/A';
+                
+                document.title = `${s.name} - Netflix News System`;
+            } else {
+                Toast.error('Failed to load series details');
+            }
+        }
+
+        // Load feedback
+        async function loadFeedback() {
+            const result = await FeedbackAPI.getByWebSeriesId(seriesId);
+            if (result.code === 200) {
+                const container = document.getElementById('feedback-list');
+                if (result.data.length === 0) {
+                    container.innerHTML = '<p style="padding: 20px; color: #757575; text-align: center;">No reviews yet. Be the first to review!</p>';
+                    return;
+                }
+                
+                container.innerHTML = result.data.map(fb => `
+                    <div style="padding: 20px; border-bottom: 1px solid #404040;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div>
+                                <strong>${fb.accountName || 'Anonymous'}</strong>
+                                <span style="color: #f5c518; margin-left: 10px;">${'★'.repeat(fb.rating)}${'☆'.repeat(5-fb.rating)}</span>
+                            </div>
+                            <span style="color: #757575;">${Format.date(fb.feedbackDate)}</span>
+                        </div>
+                        <p style="color: #e5e5e5;">${fb.feedbackText || '<i style="color: #757575;">No comment</i>'}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Check if user can review
+        function checkUserCanReview() {
+            const user = Auth.getUser();
+            if (user && user.role === 'customer') {
+                document.getElementById('add-feedback-btn').style.display = 'inline-flex';
+            }
+        }
+
+        // Setup rating stars
+        function setupRatingStars() {
+            const stars = document.querySelectorAll('#rating-stars .star');
+            stars.forEach(star => {
+                star.addEventListener('click', () => {
+                    currentRating = parseInt(star.dataset.rating);
+                    document.getElementById('rating').value = currentRating;
+                    updateStars();
+                });
+                star.addEventListener('mouseenter', () => {
+                    const rating = parseInt(star.dataset.rating);
+                    stars.forEach((s, i) => {
+                        s.classList.toggle('active', i < rating);
+                    });
+                });
+            });
+            document.getElementById('rating-stars').addEventListener('mouseleave', updateStars);
+            updateStars();
+        }
+
+        function updateStars() {
+            const stars = document.querySelectorAll('#rating-stars .star');
+            stars.forEach((s, i) => {
+                s.classList.toggle('active', i < currentRating);
+            });
+        }
+
+        // Open feedback modal
+        function openFeedbackModal() {
+            if (!Auth.isLoggedIn()) {
+                Toast.warning('Please login to submit a review');
+                window.location.href = '/login.html';
+                return;
+            }
+            document.getElementById('feedbackForm').reset();
+            currentRating = 5;
+            updateStars();
+            Modal.show('feedbackModal');
+        }
+
+        // Submit feedback
+        async function submitFeedback() {
+            const data = {
+                webSeriesId: parseInt(seriesId),
+                rating: currentRating,
+                feedbackText: document.getElementById('feedbackText').value
+            };
+            
+            Loading.show();
+            
+            try {
+                const result = await FeedbackAPI.create(data);
+                if (result.code === 200) {
+                    Toast.success('Review submitted successfully!');
+                    Modal.hide('feedbackModal');
+                    loadFeedback();
+                    loadSeriesDetail();
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to submit review');
+            } finally {
+                Loading.hide();
+            }
+        }
+    </script>
+</body>
+</html>

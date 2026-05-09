@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contracts - Netflix News System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/index.html" class="logo">NETFLIX NEWS</a>
+        <ul class="nav-links" id="nav-links">
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/web-series.html">Web Series</a></li>
+            <li><a href="/schedules.html">Schedules</a></li>
+            <li><a href="/feedback.html">Feedback</a></li>
+        </ul>
+        <div class="nav-user" id="nav-user"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">Contracts</h1>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add Contract</button>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-contracts">-</div>
+                    <div class="stat-label">Total Contracts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="total-value">-</div>
+                    <div class="stat-label">Total Contract Value</div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Web Series</th>
+                            <th>Production House</th>
+                            <th>Sign Date</th>
+                            <th>End Date</th>
+                            <th>Per Episode Fee</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table"></tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="itemModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Add Contract</h3>
+                <button class="modal-close" onclick="Modal.hide('itemModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <input type="hidden" id="itemId">
+                    <div class="form-group">
+                        <label class="form-label">Web Series *</label>
+                        <select id="webSeriesId" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Production House *</label>
+                        <select id="productionHouseId" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sign Date *</label>
+                        <input type="date" id="signDate" class="form-control" required>
+                        <small style="color: #757575;">End date will be automatically set to 1 year after sign date</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Per Episode Fee ($) *</label>
+                        <input type="number" id="perEpisodeFee" class="form-control" min="0" step="0.01" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="Modal.hide('itemModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveItem()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let currentPage = 1;
+        const pageSize = 10;
+        let webSeriesList = [];
+        let productionHouses = [];
+
+        // Check employee access
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!Auth.requireEmployee()) return;
+            await loadDropdowns();
+            loadStats();
+            loadItems();
+        });
+
+        // Load dropdowns
+        async function loadDropdowns() {
+            const [wsResult, phResult] = await Promise.all([
+                WebSeriesAPI.getAll(),
+                ProductionHouseAPI.getAll()
+            ]);
+            
+            if (wsResult.code === 200) {
+                webSeriesList = wsResult.data;
+                document.getElementById('webSeriesId').innerHTML = webSeriesList.map(ws => 
+                    `<option value="${ws.webSeriesId}">${ws.name}</option>`
+                ).join('');
+            }
+            
+            if (phResult.code === 200) {
+                productionHouses = phResult.data;
+                document.getElementById('productionHouseId').innerHTML = productionHouses.map(ph => 
+                    `<option value="${ph.productionHouseId}">${ph.name}</option>`
+                ).join('');
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            const result = await ContractAPI.getTotalValue();
+            if (result.code === 200) {
+                document.getElementById('total-value').textContent = Format.currency(result.data);
+            }
+        }
+
+        // Load items with pagination
+        async function loadItems(page = 1) {
+            currentPage = page;
+            Loading.show();
+            
+            try {
+                const result = await ContractAPI.getPage(page, pageSize);
+                if (result.code === 200) {
+                    document.getElementById('total-contracts').textContent = Format.number(result.data.totalElements);
+                    renderTable(result.data.content);
+                    Pagination.render('pagination', result.data.page, result.data.totalPages, 'loadItems');
+                }
+            } catch (error) {
+                Toast.error('Failed to load data');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Render table
+        function renderTable(items) {
+            const tbody = document.getElementById('data-table');
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #757575;">No records found.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = items.map(item => `
+                <tr>
+                    <td>${item.contractId}</td>
+                    <td>${item.webSeriesName}</td>
+                    <td>${item.productionHouseName}</td>
+                    <td>${Format.date(item.signDate)}</td>
+                    <td>${Format.date(item.endDate)}</td>
+                    <td>${Format.currency(item.perEpisodeFee)}</td>
+                    <td class="actions">
+                        <button class="btn btn-secondary btn-sm" onclick="editItem(${item.contractId})">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteItem(${item.contractId})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Open add modal
+        function openAddModal() {
+            document.getElementById('modal-title').textContent = 'Add Contract';
+            document.getElementById('itemForm').reset();
+            document.getElementById('itemId').value = '';
+            Modal.show('itemModal');
+        }
+
+        // Edit item
+        async function editItem(id) {
+            const result = await ContractAPI.getById(id);
+            if (result.code === 200) {
+                const item = result.data;
+                document.getElementById('modal-title').textContent = 'Edit Contract';
+                document.getElementById('itemId').value = item.contractId;
+                document.getElementById('webSeriesId').value = item.webSeriesId;
+                document.getElementById('productionHouseId').value = item.productionHouseId;
+                document.getElementById('signDate').value = item.signDate;
+                document.getElementById('perEpisodeFee').value = item.perEpisodeFee;
+                Modal.show('itemModal');
+            }
+        }
+
+        // Save item
+        async function saveItem() {
+            const id = document.getElementById('itemId').value;
+            const data = {
+                webSeriesId: parseInt(document.getElementById('webSeriesId').value),
+                productionHouseId: parseInt(document.getElementById('productionHouseId').value),
+                signDate: document.getElementById('signDate').value,
+                perEpisodeFee: parseFloat(document.getElementById('perEpisodeFee').value)
+            };
+            
+            Loading.show();
+            
+            try {
+                let result;
+                if (id) {
+                    result = await ContractAPI.update(id, data);
+                } else {
+                    result = await ContractAPI.create(data);
+                }
+                
+                if (result.code === 200) {
+                    Toast.success(id ? 'Updated successfully!' : 'Created successfully!');
+                    Modal.hide('itemModal');
+                    loadStats();
+                    loadItems(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to save');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Delete item
+        async function deleteItem(id) {
+            if (!confirm('Are you sure you want to delete this contract?')) return;
+            
+            Loading.show();
+            
+            try {
+                const result = await ContractAPI.delete(id);
+                if (result.code === 200) {
+                    Toast.success('Deleted successfully!');
+                    loadStats();
+                    loadItems(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to delete');
+            } finally {
+                Loading.hide();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Series - Netflix News System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/index.html" class="logo">NETFLIX NEWS</a>
+        <ul class="nav-links" id="nav-links">
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/web-series.html" class="active">Web Series</a></li>
+            <li><a href="/schedules.html">Schedules</a></li>
+            <li><a href="/feedback.html">Feedback</a></li>
+        </ul>
+        <div class="nav-user" id="nav-user"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">Web Series</h1>
+                <div id="action-buttons"></div>
+            </div>
+
+            <!-- Search and Filters -->
+            <div class="filters">
+                <div class="filter-item">
+                    <input type="text" id="search-input" class="form-control" placeholder="Search by name...">
+                </div>
+                <div class="filter-item">
+                    <select id="type-filter" class="form-control">
+                        <option value="">All Genres</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="searchSeries()">Search</button>
+                <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+            </div>
+
+            <!-- Series Grid -->
+            <div class="series-grid" id="series-grid"></div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="seriesModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Add Web Series</h3>
+                <button class="modal-close" onclick="Modal.hide('seriesModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="seriesForm">
+                    <input type="hidden" id="seriesId">
+                    <div class="form-group">
+                        <label class="form-label">Name *</label>
+                        <input type="text" id="name" class="form-control" required>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Type *</label>
+                            <select id="type" class="form-control" required>
+                                <option value="Comedy">Comedy</option>
+                                <option value="Drama">Drama</option>
+                                <option value="Romance">Romance</option>
+                                <option value="History">History</option>
+                                <option value="Sci-Fi">Sci-Fi</option>
+                                <option value="Animation">Animation</option>
+                                <option value="Food">Food</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Animal Planet">Animal Planet</option>
+                                <option value="Action">Action</option>
+                                <option value="Thriller">Thriller</option>
+                                <option value="Crime">Crime</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Episodes *</label>
+                            <input type="number" id="numberOfEpisodes" class="form-control" min="1" required>
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Original Language *</label>
+                            <input type="text" id="originalLanguage" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Release Date *</label>
+                            <input type="date" id="releaseDate" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Total Viewers</label>
+                            <input type="number" id="totalViewers" class="form-control" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Technical Interruption</label>
+                            <select id="technicalInterruption" class="form-control">
+                                <option value="No">No</option>
+                                <option value="Yes">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Countries</label>
+                        <select id="countryIds" class="form-control" multiple style="height: 100px;"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Dubbing Languages (comma separated)</label>
+                        <input type="text" id="dubbingLanguages" class="form-control" placeholder="English, Spanish, French">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Subtitle Languages (comma separated)</label>
+                        <input type="text" id="subtitleLanguages" class="form-control" placeholder="Japanese, Korean, German">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="Modal.hide('seriesModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSeries()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let currentPage = 1;
+        const pageSize = 12;
+        let allSeries = [];
+        let countries = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadCountries();
+            await loadTypes();
+            loadSeries();
+            setupActionButtons();
+        });
+
+        // Setup action buttons based on role
+        function setupActionButtons() {
+            const user = Auth.getUser();
+            if (user && user.role === 'employee') {
+                document.getElementById('action-buttons').innerHTML = `
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add Web Series</button>
+                `;
+            }
+        }
+
+        // Load countries for dropdown
+        async function loadCountries() {
+            const result = await CountryAPI.getAll();
+            if (result.code === 200) {
+                countries = result.data;
+                const select = document.getElementById('countryIds');
+                select.innerHTML = countries.map(c => 
+                    `<option value="${c.countryId}">${c.countryName}</option>`
+                ).join('');
+            }
+        }
+
+        // Load types for filter
+        async function loadTypes() {
+            const result = await WebSeriesAPI.getTypes();
+            if (result.code === 200) {
+                const select = document.getElementById('type-filter');
+                select.innerHTML = '<option value="">All Genres</option>' + 
+                    result.data.map(t => `<option value="${t}">${t}</option>`).join('');
+            }
+        }
+
+        // Load web series
+        async function loadSeries(page = 1) {
+            currentPage = page;
+            Loading.show();
+            
+            try {
+                const result = await WebSeriesAPI.getPage(page, pageSize);
+                if (result.code === 200) {
+                    allSeries = result.data.content;
+                    renderSeries(allSeries);
+                    Pagination.render('pagination', result.data.page, result.data.totalPages, 'loadSeries');
+                }
+            } catch (error) {
+                Toast.error('Failed to load web series');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Search series
+        async function searchSeries() {
+            const keyword = document.getElementById('search-input').value;
+            const type = document.getElementById('type-filter').value;
+            
+            Loading.show();
+            
+            try {
+                let result;
+                if (keyword) {
+                    result = await WebSeriesAPI.search(keyword);
+                } else if (type) {
+                    result = await WebSeriesAPI.getByType(type);
+                } else {
+                    result = await WebSeriesAPI.getAll();
+                }
+                
+                if (result.code === 200) {
+                    let filtered = result.data;
+                    if (keyword && type) {
+                        filtered = filtered.filter(s => s.type === type);
+                    }
+                    renderSeries(filtered);
+                    document.getElementById('pagination').innerHTML = '';
+                }
+            } catch (error) {
+                Toast.error('Search failed');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Reset filters
+        function resetFilters() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('type-filter').value = '';
+            loadSeries(1);
+        }
+
+        // Render series grid
+        function renderSeries(series) {
+            const container = document.getElementById('series-grid');
+            const user = Auth.getUser();
+            const isEmployee = user && user.role === 'employee';
+            
+            if (series.length === 0) {
+                container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #757575;">No web series found.</p>';
+                return;
+            }
+            
+            container.innerHTML = series.map(s => `
+                <div class="series-card">
+                    <div class="series-poster">🎬</div>
+                    <div class="series-info">
+                        <h3 class="series-title">${s.name}</h3>
+                        <div class="series-meta">
+                            <span>${s.numberOfEpisodes} Episodes</span>
+                            <span>${s.originalLanguage}</span>
+                        </div>
+                        <span class="series-type">${s.type}</span>
+                        ${s.averageRating ? `
+                            <div class="series-rating">
+                                <span>★</span>
+                                <span>${s.averageRating.toFixed(1)}</span>
+                            </div>
+                        ` : ''}
+                        <div style="margin-top: 15px;">
+                            <button class="btn btn-outline btn-sm" onclick="viewDetails(${s.webSeriesId})">Details</button>
+                            ${isEmployee ? `
+                                <button class="btn btn-secondary btn-sm" onclick="editSeries(${s.webSeriesId})">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteSeries(${s.webSeriesId})">Delete</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // View details
+        function viewDetails(id) {
+            window.location.href = `/web-series-detail.html?id=${id}`;
+        }
+
+        // Open add modal
+        function openAddModal() {
+            document.getElementById('modal-title').textContent = 'Add Web Series';
+            document.getElementById('seriesForm').reset();
+            document.getElementById('seriesId').value = '';
+            Modal.show('seriesModal');
+        }
+
+        // Edit series
+        async function editSeries(id) {
+            const result = await WebSeriesAPI.getById(id);
+            if (result.code === 200) {
+                const s = result.data;
+                document.getElementById('modal-title').textContent = 'Edit Web Series';
+                document.getElementById('seriesId').value = s.webSeriesId;
+                document.getElementById('name').value = s.name;
+                document.getElementById('type').value = s.type;
+                document.getElementById('numberOfEpisodes').value = s.numberOfEpisodes;
+                document.getElementById('originalLanguage').value = s.originalLanguage;
+                document.getElementById('releaseDate').value = s.releaseDate;
+                document.getElementById('totalViewers').value = s.totalViewers || 0;
+                document.getElementById('technicalInterruption').value = s.technicalInterruption || 'No';
+                
+                // Set countries
+                const countrySelect = document.getElementById('countryIds');
+                Array.from(countrySelect.options).forEach(opt => {
+                    opt.selected = s.countries && s.countries.some(c => c.countryId == opt.value);
+                });
+                
+                document.getElementById('dubbingLanguages').value = s.dubbingLanguages ? s.dubbingLanguages.join(', ') : '';
+                document.getElementById('subtitleLanguages').value = s.subtitleLanguages ? s.subtitleLanguages.join(', ') : '';
+                
+                Modal.show('seriesModal');
+            }
+        }
+
+        // Save series
+        async function saveSeries() {
+            const id = document.getElementById('seriesId').value;
+            const countrySelect = document.getElementById('countryIds');
+            const selectedCountries = Array.from(countrySelect.selectedOptions).map(opt => parseInt(opt.value));
+            
+            const data = {
+                name: document.getElementById('name').value,
+                type: document.getElementById('type').value,
+                numberOfEpisodes: parseInt(document.getElementById('numberOfEpisodes').value),
+                originalLanguage: document.getElementById('originalLanguage').value,
+                releaseDate: document.getElementById('releaseDate').value,
+                totalViewers: parseInt(document.getElementById('totalViewers').value) || 0,
+                technicalInterruption: document.getElementById('technicalInterruption').value,
+                countryIds: selectedCountries,
+                dubbingLanguages: document.getElementById('dubbingLanguages').value.split(',').map(s => s.trim()).filter(s => s),
+                subtitleLanguages: document.getElementById('subtitleLanguages').value.split(',').map(s => s.trim()).filter(s => s)
+            };
+            
+            Loading.show();
+            
+            try {
+                let result;
+                if (id) {
+                    result = await WebSeriesAPI.update(id, data);
+                } else {
+                    result = await WebSeriesAPI.create(data);
+                }
+                
+                if (result.code === 200) {
+                    Toast.success(id ? 'Web series updated!' : 'Web series created!');
+                    Modal.hide('seriesModal');
+                    loadSeries(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to save web series');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Delete series
+        async function deleteSeries(id) {
+            if (!confirm('Are you sure you want to delete this web series?')) return;
+            
+            Loading.show();
+            
+            try {
+                const result = await WebSeriesAPI.delete(id);
+                if (result.code === 200) {
+                    Toast.success('Web series deleted!');
+                    loadSeries(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to delete web series');
+            } finally {
+                Loading.hide();
+            }
+        }
+    </script>
+</body>
+</html>

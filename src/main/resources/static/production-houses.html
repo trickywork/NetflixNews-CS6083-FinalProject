@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Houses - Netflix News System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/index.html" class="logo">NETFLIX NEWS</a>
+        <ul class="nav-links" id="nav-links">
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/web-series.html">Web Series</a></li>
+            <li><a href="/schedules.html">Schedules</a></li>
+            <li><a href="/feedback.html">Feedback</a></li>
+        </ul>
+        <div class="nav-user" id="nav-user"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">Production Houses</h1>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add Production House</button>
+            </div>
+
+            <!-- Search -->
+            <div class="search-bar">
+                <input type="text" id="search-input" class="form-control" placeholder="Search by name...">
+                <button class="btn btn-primary" onclick="searchItems()">Search</button>
+                <button class="btn btn-secondary" onclick="resetSearch()">Reset</button>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Address</th>
+                            <th>Year Established</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table"></tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="itemModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Add Production House</h3>
+                <button class="modal-close" onclick="Modal.hide('itemModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <input type="hidden" id="itemId">
+                    <div class="form-group">
+                        <label class="form-label">Name *</label>
+                        <input type="text" id="name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address</label>
+                        <input type="text" id="address" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Year Established *</label>
+                        <input type="number" id="yearEstablished" class="form-control" min="1800" max="2030" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="Modal.hide('itemModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveItem()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let currentPage = 1;
+        const pageSize = 10;
+
+        // Check employee access
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!Auth.requireEmployee()) return;
+            loadItems();
+        });
+
+        // Load items with pagination
+        async function loadItems(page = 1) {
+            currentPage = page;
+            Loading.show();
+            
+            try {
+                const result = await ProductionHouseAPI.getPage(page, pageSize);
+                if (result.code === 200) {
+                    renderTable(result.data.content);
+                    Pagination.render('pagination', result.data.page, result.data.totalPages, 'loadItems');
+                }
+            } catch (error) {
+                Toast.error('Failed to load data');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Search items
+        async function searchItems() {
+            const keyword = document.getElementById('search-input').value;
+            if (!keyword) {
+                loadItems(1);
+                return;
+            }
+            
+            Loading.show();
+            try {
+                const result = await ProductionHouseAPI.search(keyword);
+                if (result.code === 200) {
+                    renderTable(result.data);
+                    document.getElementById('pagination').innerHTML = '';
+                }
+            } catch (error) {
+                Toast.error('Search failed');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Reset search
+        function resetSearch() {
+            document.getElementById('search-input').value = '';
+            loadItems(1);
+        }
+
+        // Render table
+        function renderTable(items) {
+            const tbody = document.getElementById('data-table');
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #757575;">No records found.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = items.map(item => `
+                <tr>
+                    <td>${item.productionHouseId}</td>
+                    <td>${item.name}</td>
+                    <td>${item.address || '-'}</td>
+                    <td>${item.yearEstablished}</td>
+                    <td class="actions">
+                        <button class="btn btn-secondary btn-sm" onclick="editItem(${item.productionHouseId})">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteItem(${item.productionHouseId})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Open add modal
+        function openAddModal() {
+            document.getElementById('modal-title').textContent = 'Add Production House';
+            document.getElementById('itemForm').reset();
+            document.getElementById('itemId').value = '';
+            Modal.show('itemModal');
+        }
+
+        // Edit item
+        async function editItem(id) {
+            const result = await ProductionHouseAPI.getById(id);
+            if (result.code === 200) {
+                const item = result.data;
+                document.getElementById('modal-title').textContent = 'Edit Production House';
+                document.getElementById('itemId').value = item.productionHouseId;
+                document.getElementById('name').value = item.name;
+                document.getElementById('address').value = item.address || '';
+                document.getElementById('yearEstablished').value = item.yearEstablished;
+                Modal.show('itemModal');
+            }
+        }
+
+        // Save item
+        async function saveItem() {
+            const id = document.getElementById('itemId').value;
+            const data = {
+                name: document.getElementById('name').value,
+                address: document.getElementById('address').value,
+                yearEstablished: parseInt(document.getElementById('yearEstablished').value)
+            };
+            
+            Loading.show();
+            
+            try {
+                let result;
+                if (id) {
+                    result = await ProductionHouseAPI.update(id, data);
+                } else {
+                    result = await ProductionHouseAPI.create(data);
+                }
+                
+                if (result.code === 200) {
+                    Toast.success(id ? 'Updated successfully!' : 'Created successfully!');
+                    Modal.hide('itemModal');
+                    loadItems(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to save');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Delete item
+        async function deleteItem(id) {
+            if (!confirm('Are you sure you want to delete this production house?')) return;
+            
+            Loading.show();
+            
+            try {
+                const result = await ProductionHouseAPI.delete(id);
+                if (result.code === 200) {
+                    Toast.success('Deleted successfully!');
+                    loadItems(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to delete');
+            } finally {
+                Loading.hide();
+            }
+        }
+    </script>
+</body>
+</html>

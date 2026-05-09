@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedules - Netflix News System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/index.html" class="logo">NETFLIX NEWS</a>
+        <ul class="nav-links" id="nav-links">
+            <li><a href="/index.html">Home</a></li>
+            <li><a href="/web-series.html">Web Series</a></li>
+            <li><a href="/schedules.html" class="active">Schedules</a></li>
+            <li><a href="/feedback.html">Feedback</a></li>
+        </ul>
+        <div class="nav-user" id="nav-user"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">Broadcast Schedules</h1>
+                <div id="action-buttons"></div>
+            </div>
+
+            <!-- Upcoming Section -->
+            <div class="card" style="margin-bottom: 20px;">
+                <div class="card-header">
+                    <h3 class="card-title">Upcoming Shows</h3>
+                </div>
+                <div id="upcoming-schedules"></div>
+            </div>
+
+            <!-- All Schedules Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Web Series</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Duration</th>
+                            <th id="actions-header" style="display: none;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedules-table"></tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="scheduleModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Add Schedule</h3>
+                <button class="modal-close" onclick="Modal.hide('scheduleModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleForm">
+                    <input type="hidden" id="scheduleId">
+                    <div class="form-group">
+                        <label class="form-label">Web Series *</label>
+                        <select id="webSeriesId" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Start Time *</label>
+                        <input type="datetime-local" id="startDatetime" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Time *</label>
+                        <input type="datetime-local" id="endDatetime" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="Modal.hide('scheduleModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSchedule()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let currentPage = 1;
+        const pageSize = 10;
+        let webSeriesList = [];
+        let isEmployee = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            isEmployee = Auth.isEmployee();
+            setupUI();
+            await loadWebSeries();
+            loadUpcoming();
+            loadSchedules();
+        });
+
+        // Setup UI based on role
+        function setupUI() {
+            if (isEmployee) {
+                document.getElementById('action-buttons').innerHTML = `
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add Schedule</button>
+                `;
+                document.getElementById('actions-header').style.display = '';
+            }
+        }
+
+        // Load web series for dropdown
+        async function loadWebSeries() {
+            const result = await WebSeriesAPI.getAll();
+            if (result.code === 200) {
+                webSeriesList = result.data;
+                const select = document.getElementById('webSeriesId');
+                select.innerHTML = webSeriesList.map(ws => 
+                    `<option value="${ws.webSeriesId}">${ws.name}</option>`
+                ).join('');
+            }
+        }
+
+        // Load upcoming schedules
+        async function loadUpcoming() {
+            const result = await ScheduleAPI.getUpcoming(5);
+            if (result.code === 200) {
+                const container = document.getElementById('upcoming-schedules');
+                if (result.data.length === 0) {
+                    container.innerHTML = '<p style="padding: 20px; color: #757575;">No upcoming shows scheduled.</p>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 15px; padding: 20px;">
+                        ${result.data.map(s => `
+                            <div style="background: #333; padding: 15px 20px; border-radius: 8px; min-width: 200px;">
+                                <div style="font-weight: 600; margin-bottom: 5px;">${s.webSeriesName}</div>
+                                <div style="font-size: 13px; color: #757575;">
+                                    ${Format.datetime(s.startDatetime)}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        // Load schedules with pagination
+        async function loadSchedules(page = 1) {
+            currentPage = page;
+            Loading.show();
+            
+            try {
+                const result = await ScheduleAPI.getPage(page, pageSize);
+                if (result.code === 200) {
+                    renderTable(result.data.content);
+                    Pagination.render('pagination', result.data.page, result.data.totalPages, 'loadSchedules');
+                }
+            } catch (error) {
+                Toast.error('Failed to load schedules');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Render table
+        function renderTable(schedules) {
+            const tbody = document.getElementById('schedules-table');
+            if (schedules.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #757575;">No schedules found.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = schedules.map(s => {
+                const start = new Date(s.startDatetime);
+                const end = new Date(s.endDatetime);
+                const duration = Math.round((end - start) / 60000);
+                
+                return `
+                    <tr>
+                        <td>${s.scheduleId}</td>
+                        <td><a href="/web-series-detail.html?id=${s.webSeriesId}">${s.webSeriesName}</a></td>
+                        <td>${Format.datetime(s.startDatetime)}</td>
+                        <td>${Format.datetime(s.endDatetime)}</td>
+                        <td>${duration} min</td>
+                        ${isEmployee ? `
+                            <td class="actions">
+                                <button class="btn btn-secondary btn-sm" onclick="editSchedule(${s.scheduleId})">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteSchedule(${s.scheduleId})">Delete</button>
+                            </td>
+                        ` : ''}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Open add modal
+        function openAddModal() {
+            document.getElementById('modal-title').textContent = 'Add Schedule';
+            document.getElementById('scheduleForm').reset();
+            document.getElementById('scheduleId').value = '';
+            Modal.show('scheduleModal');
+        }
+
+        // Edit schedule
+        async function editSchedule(id) {
+            const result = await ScheduleAPI.getById(id);
+            if (result.code === 200) {
+                const s = result.data;
+                document.getElementById('modal-title').textContent = 'Edit Schedule';
+                document.getElementById('scheduleId').value = s.scheduleId;
+                document.getElementById('webSeriesId').value = s.webSeriesId;
+                document.getElementById('startDatetime').value = s.startDatetime.slice(0, 16);
+                document.getElementById('endDatetime').value = s.endDatetime.slice(0, 16);
+                Modal.show('scheduleModal');
+            }
+        }
+
+        // Save schedule
+        async function saveSchedule() {
+            const id = document.getElementById('scheduleId').value;
+            const data = {
+                webSeriesId: parseInt(document.getElementById('webSeriesId').value),
+                startDatetime: document.getElementById('startDatetime').value + ':00',
+                endDatetime: document.getElementById('endDatetime').value + ':00'
+            };
+            
+            // Validate end time is after start time
+            if (new Date(data.endDatetime) <= new Date(data.startDatetime)) {
+                Toast.error('End time must be after start time');
+                return;
+            }
+            
+            Loading.show();
+            
+            try {
+                let result;
+                if (id) {
+                    result = await ScheduleAPI.update(id, data);
+                } else {
+                    result = await ScheduleAPI.create(data);
+                }
+                
+                if (result.code === 200) {
+                    Toast.success(id ? 'Schedule updated!' : 'Schedule created!');
+                    Modal.hide('scheduleModal');
+                    loadUpcoming();
+                    loadSchedules(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to save schedule');
+            } finally {
+                Loading.hide();
+            }
+        }
+
+        // Delete schedule
+        async function deleteSchedule(id) {
+            if (!confirm('Are you sure you want to delete this schedule?')) return;
+            
+            Loading.show();
+            
+            try {
+                const result = await ScheduleAPI.delete(id);
+                if (result.code === 200) {
+                    Toast.success('Schedule deleted!');
+                    loadUpcoming();
+                    loadSchedules(currentPage);
+                } else {
+                    Toast.error(result.message);
+                }
+            } catch (error) {
+                Toast.error('Failed to delete schedule');
+            } finally {
+                Loading.hide();
+            }
+        }
+    </script>
+</body>
+</html>
