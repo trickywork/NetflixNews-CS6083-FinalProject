@@ -3,12 +3,12 @@ steps:
     args:
       - build
       - -t
-      - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio/netflix-news:$COMMIT_SHA
+      - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio-repo/netflix-news:$COMMIT_SHA
       - .
   - name: gcr.io/cloud-builders/docker
     args:
       - push
-      - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio/netflix-news:$COMMIT_SHA
+      - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio-repo/netflix-news:$COMMIT_SHA
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
@@ -16,7 +16,7 @@ steps:
       - deploy
       - netflix-news
       - --image
-      - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio/netflix-news:$COMMIT_SHA
+      - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio-repo/netflix-news:$COMMIT_SHA
       - --region
       - us-central1
       - --platform
@@ -31,4 +31,4 @@ steps:
       - --cpu
       - "1"
 images:
-  - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio/netflix-news:$COMMIT_SHA
+  - us-central1-docker.pkg.dev/$PROJECT_ID/portfolio-repo/netflix-news:$COMMIT_SHA
