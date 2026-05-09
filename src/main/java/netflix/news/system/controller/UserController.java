@@ -1,11 +1,13 @@
 package netflix.news.system.controller;
 
 import netflix.news.system.dto.ApiResponse;
+import netflix.news.system.dto.CreateEmployeeRequest;
 import netflix.news.system.entity.User;
 import netflix.news.system.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.List;
 
 /**
@@ -50,11 +52,9 @@ public class UserController {
      * Create new employee user
      */
     @PostMapping("/employee")
-    public ApiResponse<User> createEmployee(
-            @RequestParam String username,
-            @RequestParam String password) {
+    public ApiResponse<User> createEmployee(@Valid @RequestBody CreateEmployeeRequest request) {
         try {
-            User user = userService.createEmployee(username, password);
+            User user = userService.createEmployee(request.getUsername(), request.getPassword());
             return ApiResponse.success("Employee created successfully", user);
         } catch (Exception e) {
             return ApiResponse.badRequest(e.getMessage());

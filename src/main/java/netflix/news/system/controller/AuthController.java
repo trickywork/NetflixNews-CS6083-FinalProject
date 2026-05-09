@@ -1,6 +1,7 @@
 package netflix.news.system.controller;
 
 import netflix.news.system.dto.ApiResponse;
+import netflix.news.system.dto.ChangePasswordRequest;
 import netflix.news.system.dto.LoginRequest;
 import netflix.news.system.dto.LoginResponse;
 import netflix.news.system.dto.RegisterRequest;
@@ -67,10 +68,9 @@ public class AuthController {
     @PostMapping("/change-password")
     public ApiResponse<Void> changePassword(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam String oldPassword,
-            @RequestParam String newPassword) {
+            @Valid @RequestBody ChangePasswordRequest request) {
         try {
-            userService.changePassword(principal.getUserId(), oldPassword, newPassword);
+            userService.changePassword(principal.getUserId(), request.getOldPassword(), request.getNewPassword());
             return ApiResponse.success("Password changed successfully");
         } catch (Exception e) {
             return ApiResponse.badRequest(e.getMessage());

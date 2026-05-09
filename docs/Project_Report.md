@@ -1022,5 +1022,5 @@ netflix-news-system/
 
 **Document Prepared By:** [Your Name]  
 **Date:** December 2025  
-**Course:** [Course Name]  
-**Institution:** [University Name]
+**Project:** Netflix News Management System  
+**Institution:** New York University

@@ -94,8 +94,8 @@ const AuthAPI = {
     login: (username, password) => api.post('/auth/login', { username, password }),
     register: (data) => api.post('/auth/register', data),
     getCurrentUser: () => api.get('/auth/me'),
-    changePassword: (oldPassword, newPassword) => 
-        api.post(`/auth/change-password?oldPassword=${encodeURIComponent(oldPassword)}&newPassword=${encodeURIComponent(newPassword)}`)
+    changePassword: (oldPassword, newPassword) =>
+        api.post('/auth/change-password', { oldPassword, newPassword })
 };
 
 // Web Series API
@@ -202,8 +202,8 @@ const UserAPI = {
     getAll: () => api.get('/users'),
     getByRole: (role) => api.get(`/users/role/${role}`),
     getById: (id) => api.get(`/users/${id}`),
-    createEmployee: (username, password) => 
-        api.post(`/users/employee?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`),
+    createEmployee: (username, password) =>
+        api.post('/users/employee', { username, password }),
     delete: (id) => api.delete(`/users/${id}`)
 };
 

@@ -1,11 +1,12 @@
 # Netflix News System
 
+[![CI](https://github.com/trickywork/netflix-news-system/actions/workflows/ci.yml/badge.svg)](https://github.com/trickywork/netflix-news-system/actions/workflows/ci.yml)
+
 Netflix News System is a Spring Boot and MySQL management system for a Netflix-style content database. It includes a static HTML/CSS/JavaScript frontend served by Spring Boot and REST APIs for authentication, web series, schedules, contracts, feedback, accounts, and dashboard statistics.
 
 ## Current Status
 
-- Local repo: `/Users/junliu/git_repo/NetflixNews-CS6083-FinalProject`
-- GitHub repo: `https://github.com/trickywork/NetflixNews-CS6083-FinalProject`
+- GitHub repo: `https://github.com/trickywork/netflix-news-system`
 - Cloud Run service: not deployed yet
 - Database requirement: MySQL
 
@@ -30,7 +31,7 @@ This project is ready for local development. A cloud deployment should be added 
 ## Project Structure
 
 ```text
-NetflixNews-CS6083-FinalProject/
+netflix-news-system/
   src/main/java/
     controller/
     service/
@@ -68,7 +69,7 @@ NetflixNews-CS6083-FinalProject/
 Create a local env file:
 
 ```bash
-cd /Users/junliu/git_repo/NetflixNews-CS6083-FinalProject
+cd netflix-news-system
 cp .env.example .env
 ```
 
@@ -165,11 +166,7 @@ token=
 
 Use the login request first, then set the JWT token for protected endpoints.
 
-The repo-exported backup copy is stored outside GitHub at:
-
-```text
-/Users/junliu/CourseArtifacts/postman/project-exported/Netflix News System.postman_collection.json
-```
+The exported backup copy is kept in a private local archive outside this public repo.
 
 ## Tests And Build
 
