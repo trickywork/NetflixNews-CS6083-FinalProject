@@ -25,7 +25,7 @@ This project is ready for local development. A cloud deployment should be added 
 - Static HTML/CSS/JavaScript frontend
 - ECharts dashboard visualizations
 - Docker-ready Spring Boot app
-- Postman collection for API testing
+- API testing via local Postman workspace
 
 ## Project Structure
 
@@ -46,8 +46,6 @@ NetflixNews-CS6083-FinalProject/
     configuration.md
     Project_Report.md
     get_record_counts.sql
-  postman/
-    Netflix News System.postman_collection.json
   pom.xml
   Dockerfile
 ```
@@ -152,10 +150,10 @@ docs/Project_Report.md
 
 ## Postman
 
-Import:
+Use the local Postman workspace collection:
 
 ```text
-postman/Netflix News System.postman_collection.json
+Netflix News System
 ```
 
 Suggested variables:
@@ -166,6 +164,12 @@ token=
 ```
 
 Use the login request first, then set the JWT token for protected endpoints.
+
+The repo-exported backup copy is stored outside GitHub at:
+
+```text
+/Users/junliu/CourseArtifacts/postman/project-exported/Netflix News System.postman_collection.json
+```
 
 ## Tests And Build
 
